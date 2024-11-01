@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件存储系统</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .file-list {
+            margin: 20px 0;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            background-color: white;
+        }
+        .file-item:hover {
+            background-color: #f8f8f8;
+        }
+        .upload-form {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            text-align: center;
+        }
+        button {
+            padding: 6px 12px;
+            margin: 0 4px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .delete-btn {
+            background-color: #f44336;
+        }
+        .delete-btn:hover {
+            background-color: #da190b;
+        }
+        .view-btn {
+            background-color: #2196F3;
+        }
+        .view-btn:hover {
+            background-color: #0b7dda;
+        }
+        .file-content {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            max-width: 80%;
+            max-height: 80vh;
+            overflow: auto;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>文件存储系统</h1>
+        
+        <div class="upload-form">
+            <h2>上传文件</h2>
+            <form id="uploadForm">
+                <input type="file" id="fileInput" required>
+                <button type="submit">上传</button>
+            </form>
+        </div>
+
+        <div class="file-list">
+            <h2>文件列表</h2>
+            <div id="fileList"></div>
+        </div>
+
+        <div id="fileContent" class="file-content">
+            <h3 id="fileContentTitle"></h3>
+            <pre id="fileContentBody"></pre>
+            <button onclick="closeFileContent()">关闭</button>
+        </div>
+    </div>
+
+    <script>
+        async function loadFiles() {
+            try {
+                const response = await fetch('/api/files');
+                const files = await response.json();
+                const fileList = document.getElementById('fileList');
+                fileList.innerHTML = '';
+                
+                files.forEach(file => {
+                    const div = document.createElement('div');
+                    div.className = 'file-item';
+                    div.innerHTML = `
+                        <span>${file}</span>
+                        <div>
+                            <button class="view-btn" onclick="viewFile('${file}')">查看</button>
+                            <button class="delete-btn" onclick="deleteFile('${file}')">删除</button>
+                        </div>
+                    `;
+                    fileList.appendChild(div);
+                });
+            } catch (err) {
+                alert('加载文件列表失败');
+            }
+        }
+
+        async function viewFile(filename) {
+            try {
+                const response = await fetch(`/api/files/${filename}`);
+                if (!response.ok) throw new Error('文件不存在');
+                
+                const content = await response.text();
+                const fileContent = document.getElementById('fileContent');
+                const fileContentTitle = document.getElementById('fileContentTitle');
+                const fileContentBody = document.getElementById('fileContentBody');
+                
+                fileContentTitle.textContent = filename;
+                fileContentBody.textContent = content;
+                fileContent.style.display = 'block';
+            } catch (err) {
+                alert('查看文件失败');
+            }
+        }
+
+        function closeFileContent() {
+            document.getElementById('fileContent').style.display = 'none';
+        }
+
+        async function deleteFile(filename) {
+            if (confirm(`确定要删除 ${filename} 吗？`)) {
+                try {
+                    const response = await fetch(`/api/files/${filename}`, { 
+                        method: 'DELETE' 
+                    });
+                    if (!response.ok) throw new Error('删除失败');
+                    await loadFiles();
+                } catch (err) {
+                    alert('删除文件失败');
+                }
+            }
+        }
+
+        document.getElementById('uploadForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData();
+            const fileInput = document.getElementById('fileInput');
+            
+            if (!fileInput.files.length) {
+                alert('请选择文件');
+                return;
+            }
+
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch('/api/files', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) throw new Error('上传失败');
+                
+                fileInput.value = '';
+                await loadFiles();
+            } catch (err) {
+                alert('上传文件失败');
+            }
+        };
+
+        // 初始加载
+        loadFiles();
+
+        // 点击外部关闭文件内容显示
+        document.addEventListener('click', (e) => {
+            const fileContent = document.getElementById('fileContent');
+            if (e.target === fileContent) {
+                closeFileContent();
+            }
+        });
+    </script>
+</body>
+</html>
